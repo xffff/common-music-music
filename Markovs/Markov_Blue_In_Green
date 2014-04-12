@@ -1,0 +1,21 @@
+define variable key_voice_one = {76 74 72 70 69 67 65 74 64 62 61 62 65 69 72 69 67 65 72 68 71 69 77 73}
+
+define variable rate_voice_one = {1.50 0.50 1.50 0.50 1.50 0.50 0.50 1.50 0.75 0.25 0.25 0.25 0.25 0.25 1.50 0.50 1.50 0.50 1.50 0.50 1.50 0.50 1.50 0.50}
+
+define process playtune (reps, pat, rate)
+  run repeat reps
+    for n = next(pat)
+    for r = next(rate)
+    send "mp:midi", key: n, dur: r
+    wait r
+  end
+
+define variable markov_key_voice_one = markov-analyze(key_voice_one, order: 1, mode: 2)
+define variable markov_rate_voice_one = markov-analyze(rate_voice_one, order: 1, mode: 2)
+
+sprout list (
+playtune(200, markov_key_voice_one, markov_rate_voice_one),
+playtune(200, markov_key_voice_one, markov_rate_voice_one),
+playtune(200, markov_key_voice_one, markov_rate_voice_one),
+playtune(200, markov_key_voice_one, markov_rate_voice_one)
+), {0 16 23 35.5}, "blueingreen2.mid"

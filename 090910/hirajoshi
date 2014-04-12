@@ -1,0 +1,127 @@
+;;; -*- syntax: Sal2; font-size: 16; theme: "Emacs"; -*-
+
+define variable pattern_length = {2 3 5 7 11 13 17}
+
+print pick(pattern_length)
+
+variable scales = {{0 1 3 5 8} ; 1142
+                   {0 1 3 5 9} ; 1142
+                   {0 1 9 7 9} ; 1143
+                   {0 1 4 5 8} ; 1144
+                   {0 1 4 5 9} ; 1145
+                   }   
+
+function make_scale(scale)
+ loop with fundamental = 21 + pick(scale),
+           thisnote = fundamental,  ; range 21-108 (a0-c8)
+           count = 0,
+           lscale = {}
+  until thisnote >= 108
+   set thisnote += nth(scale, count)
+   set lscale &= thisnote
+   set count += 1
+   if(count >= 4)
+     set fundamental += 12
+     set thisnote = fundamental
+     set count = 0
+   end
+  finally lscale
+ end
+end
+
+print note(make_scale(nth(scales,0)))
+variable randomscale = make_scale(nth(scales,random(5)))
+
+process play_line(scale, fund, rate, up_down)
+  with key_list = scale, ; make_scale(nth(scales,random(5))),
+       numnotes = length(key_list),
+       len = pick(pattern_length),
+       amp = pick(20, 36, 36, 36, 36, 61, 61, 61, 61, 71, 71, 71, 84, 98, 113, 127),   ; static velocity value for pattern
+       lamp = 0,
+       firstnote = fit(fund, 0, numnotes, 1),
+       thisindex = 0,
+       key = nth(key_list, firstnote),
+       i = 0
+  until i >= len
+  set i += 1
+  set lamp = odds(0.5, 0, amp)                 ; probability of rest 1/2
+  set thisindex = fit((firstnote + (i * up_down)), 0, numnotes, 1)
+  if(thisindex < numnotes - 1)                     ; make sure we dont get OOB values
+    if(thisindex > 0)
+      set key = nth(key_list, thisindex)
+      send("mp:midi", key: key, dur: rate, amp: lamp)
+    else
+      print("A number in play_line was < 0!")
+    end
+  else
+    print("A number in play_line was > numnotes!")
+  end
+  wait rate
+end
+
+sprout (play_line(randomscale, 5, 1/16, 3))
+
+process play_chord(scale, fund_idx, rate)
+  with numnotes = length(scale),
+       inversion = odds(0.5, pick(2, 3, 5), pick(2, 3, 5) * -1),
+       lfund_idx = fit((fund_idx + inversion), 0, numnotes, 2), 
+       len = pick(pattern_length),
+       amp = pick(20, 36, 36, 36, 36, 61, 61, 61, 61, 71, 71, 71, 84, 98, 113, 127),
+       lamp = 0,
+       thisindex = 0,
+       chord = {},
+       chord_length = 0,
+       j = 0
+  until elapsed() >= len
+  set chord_length = pick(2,3,4)
+  set rate = rate * pick(1,1,1,2,2,2)
+  set j = 0
+  set lamp = odds(0.5, 0, amp)
+  loop repeat chord_length
+    set thisindex =  fit((lfund_idx + j), 0, numnotes, 2)
+    if(thisindex < numnotes)
+      if(thisindex > 0)
+        set chord &= nth(scale, thisindex)
+        set j += pick(1,2)
+      else
+       print("A number in play_chord was < 0!")
+      end
+    else
+      print("A number in play_chord was > numnotes!")
+    end
+  end
+  loop repeat chord_length
+    set key = pick(chord)
+    send("mp:midi", key: key, dur: rate, amp: lamp)
+  end
+  wait rate
+end
+
+sprout(play_chord(randomscale, 24, 1/16))
+
+process test(len)
+  with mrate = 1/4,
+       rate = 1/8,
+       arp = 1,
+       index = between(0, length(scale) - 1),
+       scale = {}
+  until elapsed() >= len
+  set mrate = pick(1/4,1/2,1)
+  set rate = pick(1/2,1/4,1/8,1/16)
+  set scale = make_scale(nth(scales,random(5)))
+  set index += odds(0.5, pick(1,1,1,2,2,3), pick(1,1,1,2,2,3) * -1)
+  set arp = odds(0.5, pick(1,1,1,2,2,3), pick(1,1,1,2,2,3) * -1)
+  if(odds(0.75))
+    if(odds(0.5))
+      sprout(play_line(scale, index, rate, arp))
+      if(odds(0.5))
+        sprout(play_line(scale, index, rate, arp))
+      end
+    else
+      sprout(play_chord(scale, index, rate))
+    end
+  end
+  wait mrate
+end
+
+sprout(test(500), "hj_test-8.mid")

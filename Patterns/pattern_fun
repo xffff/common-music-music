@@ -1,0 +1,62 @@
+define variable randomrhythm = make-heap({1 2/3 1/2 1/3 1/5 1/7}, for: make-heap({1 3 7 11 13 17 22}))
+
+print next(randomrhythm, #t)
+
+define function make_rhythms() 
+  loop with thisrhythm = 1, rhythmlist = next(randomrhythm,#t), playrhythmlist = {}
+    for r in rhythmlist 
+    set thisrhythm = r
+    if thisrhythm = 1/7 then set playrhythmlist = make-cycle({1/7}, for: make-heap({7 14}))
+    if thisrhythm = 1/5 then set playrhythmlist = make-cycle({1/5}, for: make-heap({5 10}))
+    if thisrhythm = 2/3 then set playrhythmlist = make-cycle({2/3}, for: make-heap({3 6}))
+    if thisrhythm = 1/3 then set playrhythmlist = make-cycle({1/3}, for: make-heap({3 6}))
+    if thisrhythm = 1/2 then set playrhythmlist = make-cycle({1/2}, for: make-heap({2 4 6 8}))
+    if thisrhythm = 1 then set playrhythmlist = make-cycle({1}, for: make-heap({1 2 3 4}))
+    return next(playrhythmlist, #t)
+end
+
+print next(make_rhythms)
+
+define variable chordlist = make-cycle(key({"c4" "e4" "g4" "b4"}), for: make-heap({50}))
+print next(chordlist)
+print next(chordlist, #t)
+
+define variable progression = next(chordlist, #t)
+
+define process play_line(reps, rm, k)
+ run 
+   repeat reps
+   for lrm = rm / pick(2,4,8)
+   for lk = k + pick(-13,-11,-7,-5,-3,-1,0,1,3,7,11,13)
+   send "mp:midi", key: lk, dur: lrm, amp: random(50) + 30
+   wait lrm
+   end
+
+sprout play_line(100, 0.5, 56)
+
+define process play_chords(r, k, rm)
+  run
+    loop for i in r
+     for lk = k + pick(-13,-11,-7,-5,-3,-1,0,1,3,7,11,13)
+     send "mp:midi", key: lk, dur: rm, amp: 50
+     end
+     wait rm
+end
+
+print(next(make_rhythms))
+print(next(chordlist, #t))
+
+define process make_rhy_play()
+  run for n in progression
+    until(n > 50)
+    for randprime = pick(3,5,7)
+    for r = next(make_rhythms)
+    for rm = pick(r)
+    for k = next(chordlist)
+    if odds(0.05) then sprout play_chords(r, k, rm)
+    if odds(0.1) then sprout play_line(randprime, rm, k)
+end
+
+
+sprout make_rhy_play()
+sprout make_rhy_play(), "Prime_Patterns_test2.mid"

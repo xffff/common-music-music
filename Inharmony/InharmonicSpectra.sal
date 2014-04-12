@@ -1,0 +1,110 @@
+
+define function inharmonic_spectra (fund, harmonics, inharm)
+  loop with pitch = {}, thispitch = fund
+    for j from 1 to harmonics
+    set inharm = random(inharm)
+    set inharm = inharm - inharm / 2
+    set thispitch = fund * j
+    set thispitch += inharm
+    set pitch &= thispitch
+    finally return pitch
+  end
+
+print(inharmonic_spectra(60, 20, 10))
+
+define process inharmonic_note (notelist, rate)
+  run 
+    for note in notelist
+    send "mp:midi", key: note, amp: random(100), dur: rate
+    wait rate
+  end
+
+sprout inharmonic_note(key(shuffle(inharmonic_spectra(10, 175, 100))), 0.1)
+
+define process inharmonic_chord (notelist, rate)
+  run for note in notelist
+    for harms = random(10) + 1
+    for iharm = random(100) + 1
+    for keys = shuffle(inharmonic_spectra(note, harms, iharm))
+    loop for k in keys
+      send "mp:midi", key: k, amp: random(100), dur: rate
+     end
+    wait rate
+  end
+
+define variable fund_prog = key({c4 d4 e4 f4 g4 a4 b4})
+sprout inharmonic_chord (fund_prog, 0.3)
+
+define function inharmonic_prog_gen (fund, len, inharm)
+  loop with prog = {}, notelist = inharmonic_spectra(fund, len, inharm), thispitch = 0
+    for note in notelist
+    set prog &= key(note)
+    finally return shuffle(prog)
+  end
+
+print(inharmonic_prog_gen (60, 10, 100))
+sprout inharmonic_chord(inharmonic_prog_gen(60,1050,100), 0.1), "inharmonic_chord.mid"
+
+define process inharmonic_improv(fund, firstrate, reps, probm, probc, probn)
+  run 
+    repeat reps
+    for harms = random(20) + 1
+    for inharm = harms * 10
+    for rate = firstrate / pick(1,2,4,8)
+    for mfund = pick(-11, -5, -7, -3, -1, 1, 3, 5, 7, 11)
+    for prog = inharmonic_prog_gen(fund, harms, inharm)
+    if odds(probm) then set fund += mfund
+    if odds(probc) then sprout inharmonic_chord(prog, rate) 
+    if odds(probn) then sprout inharmonic_note(prog, rate)
+    wait rate
+  end
+
+sprout inharmonic_improv(33, 1, 1000, 0.05, 0.01, 0.2), "inharmonic_improv.mid"
+
+define process inharmonic_note_ly (notelist, rate)
+  run 
+    for note in notelist
+    for dur = rate
+    send "mp:midi", key: key(note), amp: random(100), dur: rate
+    send "fms:note", pitch: note, dur: dur
+    wait rate
+  end
+
+begin
+  with parts = {{:id "apart" :inst "piano"}}
+  sprout inharmonic_note_ly(inharmonic_prog_gen(60,50,10), 0.5), "inharmonicnote.ly", parts: parts
+end
+
+define process inharmonic_chord_ly (notelist, rate, harmin)
+  run for note in notelist
+    for harms = harmin
+    for iharm = random(100) + 1
+    for keys = key(shuffle(inharmonic_spectra(note, harms, iharm)))
+    loop for k in keys
+      send "mp:midi", key: k, amp: random(100), dur: rate
+      send "fms:note", pitch: k, dur: rate
+     end
+    wait rate
+  end
+
+begin
+  with parts = {{:id "apart" :inst "piano"}}
+  sprout inharmonic_chord_ly(inharmonic_prog_gen(60,50,100), 0.5, 10), "inharmonicchord.ly", parts: parts
+end
+
+define process inharmonic_improv_ly(fund, firstrate, reps, probc, probn)
+  run 
+    repeat reps
+    for harms = random(9) + 1
+    for inharm = harms * 10
+    for rate = firstrate / pick(1,2,4,8)
+    for prog = inharmonic_prog_gen(fund, harms, inharm)
+    if odds(probc) then sprout inharmonic_chord_ly(prog, rate, harms) 
+    if odds(probn) then sprout inharmonic_note_ly(prog, rate)
+    wait rate
+  end
+
+begin
+  with parts = {{:id "apart" :inst "piano"}}
+  sprout inharmonic_improv_ly(60, 1, 200, 0.1, 0.1), "inharmonicspectra.ly", parts: parts
+end

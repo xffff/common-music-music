@@ -1,0 +1,97 @@
+;;; -*- syntax: Sal2; font-size: 16; theme: "Emacs"; -*-
+
+define variable pattern_length = {2 3 5 7 11 13 17 19 23 29 31 37 41}
+
+print pick(pattern_length)
+
+function make_scale(low, high)
+ loop with lpattern_length = (pick(pattern_length) + 1), thisnote = low, scale = {}, 
+           difference = high - low, interval = difference / lpattern_length
+  for i from 0 to lpattern_length
+   set scale &= thisnote
+   set thisnote += interval
+  finally scale
+ end
+end
+
+print make_scale(20,30)
+print length(make_scale(20,30))
+
+process play_line(low,high,rate)
+  with key_list = make_scale(low, high),
+       length = length(key_list) - 1,
+       amp = 60,
+       i = 0,
+       key = nth(key_list, i)
+  until i >= length
+  set amp = odds(0.5, 0, pick(20, 30, 40, 50, 60, 70))
+  set i += 1
+  set key = nth(key_list, i)
+  send("mp:midi", key: key, dur: rate, amp: amp, chan: 0)
+  wait rate
+end
+
+sprout (play_line(30, 100, 0.1))
+
+print shuffle(unique(int(make_scale(45,55))))
+
+process play_chord(fund, rate, arp)
+  with lfund = fit(fund + 20, 21, 84, 1), 
+       topnote = lfund + 24,
+       notes = make_scale(lfund,topnote),
+       chord = {},
+       length = length(notes) - 1,
+       amp = 60,
+       dur = rate
+  until elapsed() >= pick(3,5,7,9,13)
+  set amp = odds(0.75, 0, pick(20, 30, 40, 50, 60))
+  set chord = shuffle(unique(int(notes)))
+  if(arp > 0)
+   set dur = rate * 2
+   set rate = dur
+  else
+   set dur = arp
+   set rate = rate * 2
+  end
+  loop repeat pick(2,3,4,5)
+    set key = pick(chord)
+    send("mp:midi", key: key, dur: dur, amp: amp, chan: 1)
+    wait arp
+  end
+  wait rate
+end
+
+process test(len)
+  with high = 22,
+       low = 21
+  for rate = pick(1/16, 1/8, 1/4, 1/2, 1)
+  for mrate = pick(1, 1/2)
+  until elapsed() >= len
+  if(odds(0.25))
+   if(odds(0.75)) 
+     if(odds(0.5)) 
+      if(high <= 96)
+       set high += pick(3,5,7,11,13)
+      end
+      if(low <= 96)
+       set low += pick(3,5,7,11,13)
+      end
+     else
+      if(high >= 32)
+       set high += pick(-3,-5,-7,-11)
+      end
+      if(low >= 32)
+       set low += pick(-3,-5,-7,-11)
+      end
+     end
+    sprout(list(play_line(low,high,rate),
+                play_chord(high,rate,0)))
+   else
+    sprout(list(play_chord(high,rate,rate),
+                play_chord(high,rate,0))) 
+   end
+  end
+  wait mrate
+end
+
+sprout(test(100), "test.mid")

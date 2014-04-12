@@ -1,0 +1,81 @@
+define variable randomrhythm = make-heap({1 2/3 1/2 1/3 1/5 1/7}, for: make-heap({1 3 7 11 13 17 22}))
+
+print next(randomrhythm, #t)
+
+define function make_rhythms() 
+  loop with thisrhythm = 1, rhythmlist = next(randomrhythm,#t), playrhythmlist = {}
+    loop for r in rhythmlist 
+     set thisrhythm = r
+     if thisrhythm = 1/7 then set playrhythmlist &= next(make-cycle({1/7}, for: make-heap({7 14})), #t)
+     if thisrhythm = 1/5 then set playrhythmlist &= next(make-cycle({1/5}, for: make-heap({5 10})), #t)
+     if thisrhythm = 2/3 then set playrhythmlist &= next(make-cycle({2/3}, for: make-heap({3 6})), #t)
+     if thisrhythm = 1/3 then set playrhythmlist &= next(make-cycle({1/3}, for: make-heap({3 6})), #t)
+     if thisrhythm = 1/2 then set playrhythmlist &= next(make-cycle({1/2}, for: make-heap({2 4 6 8})), #t)
+     if thisrhythm = 1   then set playrhythmlist &= next(make-cycle({1},   for: make-heap({1 2 3 4})), #t)
+    end
+   return next(playrhythmlist, #t)
+end
+
+print next(make_rhythms)
+
+define variable chordlist = make-cycle(key({"c4" "g4"}), for: make-heap({50}))
+print next(chordlist)
+print next(chordlist, #t)
+
+print(next(make_rhythms))
+
+define variable progression = next(chordlist)
+print(nth(progression, 2))
+print next(progression, #t)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+define process new_primeplay()
+  run 
+    for len = pick(2, 3, 5, 7, 11, 13, 17, 19, 23)
+    for mainlen = length(next(chordlist, #t))
+    for k = next(chordlist)
+    for i = 0
+    for rhylist = nth(nth(next(make_rhythms), i), i)
+    for rhy = first(rhylist) *  2
+    until elapsed() >= mainlen
+    set i = i + 1
+    if odds(0.25) then sprout new_prime_chords(k)
+    if odds(0.33) then sprout new_prime_line(k)
+    wait rhy
+end
+
+sprout new_primeplay()
+sprout make_rhy_play(), "Prime_Patterns_test2.mid"
+
+define process new_prime_chords(k)
+  run
+     for i from 0 to length(next(chordlist, #t))
+     for rhylist = nth(nth(next(make_rhythms), i), i)
+     for rhy = first(rhylist) * 2
+     for len = length(rhylist)
+      until elapsed() >= len
+       loop 
+         for note = k + pick(-13,-11,-7,-5,-3,-1,0,1,3,7,11,13) - 12
+         repeat 10
+         send "mp:midi", key: note, dur: rhy, amp: random(60)    
+    end
+  wait rhy
+end
+
+sprout new_prime_chords(72)
+
+
+define process new_prime_line(inote)
+ run fr
+   for rhylist = nth(nth(next(make_rhythms), i), i)
+   for rhy = first(rhylist)
+   for len = length(rhylist)
+   for note = inote + pick(-5,-3,-1,0,1,3,7,11,13)
+   until elapsed() >= len
+   send "mp:midi", key: note, dur: rhy, amp: random(60)
+   wait rhy
+   end
+
+
+sprout new_prime_line(72)

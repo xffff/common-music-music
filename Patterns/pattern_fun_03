@@ -1,0 +1,77 @@
+define variable randomrhythm = make-heap({1 2/3 1/2 1/3 1/5 1/7}, for: make-heap({1 3 7 11 13 17 22}))
+
+print next(randomrhythm, #t)
+
+define function make_rhythms() 
+  loop with thisrhythm = 1, rhythmlist = next(randomrhythm,#t), playrhythmlist = {}
+    loop for r in rhythmlist 
+     set thisrhythm = r
+     if thisrhythm = 1/7 then set playrhythmlist &= next(make-cycle({1/7}, for: make-heap({7 14})), #t)
+     if thisrhythm = 1/5 then set playrhythmlist &= next(make-cycle({1/5}, for: make-heap({5 10})), #t)
+     if thisrhythm = 2/3 then set playrhythmlist &= next(make-cycle({2/3}, for: make-heap({3 6})), #t)
+     if thisrhythm = 1/3 then set playrhythmlist &= next(make-cycle({1/3}, for: make-heap({3 6})), #t)
+     if thisrhythm = 1/2 then set playrhythmlist &= next(make-cycle({1/2}, for: make-heap({2 4 6 8})), #t)
+     if thisrhythm = 1   then set playrhythmlist &= next(make-cycle({1},   for: make-heap({1 2 3 4})), #t)
+    end
+   return playrhythmlist
+end
+
+print first(next(make_rhythms))
+print length(first(next(make_rhythms)))
+
+define variable chordlist = make-cycle(key({"c4" "ds4" "g4" "b4" "d5" "fs5"}), for: make-heap({50}))
+print next(chordlist)
+print next(chordlist, #t)
+
+print(next(make_rhythms))
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+define process new_primeplay()
+  run 
+    for mainlen = length(next(chordlist, #t))
+    for k = next(chordlist)
+    for i = 0
+    for rhylist = first(next(make_rhythms))
+    for rhy = first(rhylist)
+    for mrhy = rhy * 2
+    for clen = length(rhylist)
+    until elapsed() >= mainlen
+    set i = i + 1
+    if odds(0.05) then sprout new_prime_chords(k, rhy, clen)
+    if odds(0.10) then sprout new_prime_line(k, rhy, clen)
+    wait mrhy
+end
+
+sprout new_primeplay()
+sprout new_primeplay(), "PrimePlay11.mid"
+sprout make_rhy_play(), "Prime_Patterns_test2.mid"
+
+print(nth(next(make_rhythms), 1))
+
+define process new_prime_chords(k, dur, len)
+  run
+    for rhy = dur * 2
+    until elapsed() >= len
+    loop 
+     for note = k + pick(-13,-11,-7,-5,-3,-1,0,1,3,7,11,13)
+     repeat 10
+     send "mp:midi", key: note, dur: rhy, amp: random(60)    
+    end
+  wait rhy
+end
+
+sprout new_prime_chords(72, 0.5, 50)
+print next(make_rhythms)
+
+define process new_prime_line(inote, dur, len)
+ run 
+   for rhy = dur 
+   for note = inote + pick(-5,-3,-1,0,1,3,7,11,13)
+   until elapsed() >= len
+   send "mp:midi", key: note, dur: rhy, amp: random(60)
+   wait rhy
+   end
+
+print(nth(nth(next(make_rhythms), 0), 1))
+sprout new_prime_line(72, 0.5, 50)

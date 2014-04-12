@@ -1,0 +1,228 @@
+;;; -*- syntax: Sal2; font-size: 16; theme: "Emacs"; -*-
+
+define variable pattern_length = {2 3 5 7 11 13 17 19 23 29 31 37 41}
+
+print pick(pattern_length)
+
+variable scales = {{0 1 3 5 8}  ; 1142
+                   {0 1 3 5 9}  ; 1143
+                   {0 1 3 7 8}  ; 1144 (pelog)
+                   {0 1 4 5 8}  ; 1145
+                   {0 1 4 5 9}  ; 1146
+                   {0 1 4 6 8}  ; 1147
+                   {0 1 4 6 9}  ; 1148
+                   {0 1 4 7 8}  ; 1149
+                   {0 1 4 7 9}  ; 1150 (scriabin sonata 7)
+                   {0 1 4 7 10} ; 1151
+                   {0 1 5 6 9}  ; 1152 
+                   {0 1 5 6 10} ; 1153 (hira joshi)
+                   {0 1 5 7 8}  ; 1154
+                   {0 1 5 7 10} ; 1155
+                   {0 1 5 7 11} ; 1156
+                   {0 2 3 7 8}  ; 1157
+                   {0 2 3 7 9}  ; 1158
+                   {0 2 3 7 10} ; 1159
+                   {0 2 4 5 8}  ; 1160
+                   {0 2 4 7 8}  ; 1161
+                   {0 2 4 7 9}  ; 1162
+                   {0 2 4 8 11} ; 1163
+                   {0 2 5 7 8}  ; 1164
+                   {0 2 5 7 9}  ; 1165
+                   {0 2 5 8 10} ; 1166
+                   {0 2 5 9 10} ; 1167
+                   {0 2 5 9 11} ; 1168
+                   {0 2 6 7 9}  ; 1169
+                   {0 2 6 8 11} ; 1170
+                   {0 2 6 9 10} ; 1171
+                   {0 2 6 9 11} ; 1172
+                   {0 3 5 7 9}  ; 1173
+                   {0 3 5 7 9}  ; 1174
+                   {0 3 5 7 10} ; 1175
+                   {0 3 5 7 11} ; 1176
+                   {0 3 5 8 10} ; 1177
+                   {0 3 5 9 11} ; 1178
+                   {0 3 7 8 10} ; 1179
+                   {0 3 7 9 10} ; 1180
+                   {0 4 5 7 8}  ; 1181
+                   {0 4 5 7 9}  ; 1182
+                   {0 4 5 8 10} ; 1183
+                   {0 4 5 8 11} ; 1184
+                   {0 4 5 9 10} ; 1185
+                   {0 4 5 9 11} ; 1186
+                   {0 4 6 7 9}  ; 1187
+                   {0 4 6 9 10} ; 1188
+                   {0 4 7 9 10} ; 1189
+                   {0 4 7 9 11} ; 1190
+                   }   
+
+; map scale to whole keyboard (a0 - c8)
+
+function make_scale(scale)
+ loop with fundamental = 21 + pick(scale),
+           thisnote = fundamental,  ; range 21-108 (a0-c8)
+           count = 0,
+           lscale = {}
+  until thisnote >= 108
+   set thisnote += nth(scale, count)
+   set count += 1
+   if(thisnote < 108)
+        set lscale &= thisnote
+   end
+   if(count >= 4)
+     set fundamental += 12
+     set thisnote = fundamental
+     set count = 0
+   end
+  finally lscale
+ end
+end
+
+print note(make_scale(nth(scales,0)))
+variable randomscale = make_scale(nth(scales,random(5)))
+
+; play a scale from fund (index) up or down with a prime number of notes 
+
+process play_line(scale, fund, rate, up_down)
+  with key_list = scale, ; make_scale(nth(scales,random(5))),
+       numnotes = length(key_list),
+       len = pick(pattern_length),
+       amp = pick(20, 36, 36, 36, 36, 61, 61, 61, 61, 71, 71, 71, 84, 98, 113, 127),   ; static velocity value for pattern
+       lamp = 0,
+       firstnote = fit(fund, 0, numnotes, 1),
+       thisindex = 0,
+       key = nth(key_list, firstnote),
+       i = 0
+  until i >= len
+  set i += 1
+  set lamp = odds(0.5, 0, amp)                 ; probability of rest 1/2
+  set thisindex = fit((firstnote + (i * up_down)), 0, numnotes, 1)
+  if(thisindex < numnotes - 1)                     ; make sure we dont get OOB values
+    if(thisindex > 0)
+      set key = nth(key_list, thisindex)
+      send("mp:midi", key: key, dur: rate, amp: lamp)
+    else
+      print("A number in play_line was < 0!")
+    end
+  else
+    print("A number in play_line was > numnotes!")
+  end
+  wait rate
+end
+
+sprout (play_line(randomscale, 5, 1/8, 3))
+
+; play a chord from fund_idx
+
+process play_chord(scale, fund_idx, rate, reps)
+  with numnotes = length(scale),
+       inversion = pick(2, 3, 5),
+       lfund_idx = fit((fund_idx + inversion), 0, numnotes, 2), 
+       len = pick(pattern_length),
+       amp = pick(20, 36, 36, 36, 36, 61, 61, 61, 61, 71, 71, 71, 84, 98, 113, 127),
+       lamp = 0,
+       thisindex = 0,
+       chord = {},
+       chord_length = pick(3,4,5),
+       i = 0,
+       j = 0
+  until i >= reps
+  set i += 1
+  set chord_length = pick(3,4,5)
+  set rate = odds(0.5, rate * 2, rate / rate)
+  set j = 0
+  set lamp = odds(0.5, 0, amp)
+  loop repeat chord_length
+     set thisindex =  fit((lfund_idx + j), 0, numnotes, 2)
+     if(thisindex < numnotes)
+       if(thisindex > 0)
+         set chord &= nth(scale, thisindex)
+         set j += pick(1,2)
+       else
+        print("A number in play_chord was < 0!")
+       end
+     else
+       print("A number in play_chord was > numnotes!")
+     end
+  end
+  loop repeat chord_length
+    set key = pick(chord)
+    send("mp:midi", key: key, dur: rate, amp: lamp)
+  end
+  wait rate
+end
+
+sprout(play_chord(randomscale, 5, 1/8, 1))
+
+print 1/8 / 1/8
+
+; test scales
+
+process test_scales(numscales, orate)
+ with i = 0, 
+      mrate = orate / orate * 2,
+      thisscale = {},
+      numnotes = 0,
+      startindex = 0,
+      rate = orate,
+      arp = 1
+ until i >= (numscales - 1)
+ set arp = pick(1,2,3,4,5)
+ set i += odds(0.5, 1, 0)
+ set rate = odds(.25, orate / 2, orate)
+ set thisscale = make_scale(nth(scales, i))
+ set numnotes = length(thisscale)
+ set startindex = fit(pick(pattern_length), 0, numnotes - 1, 1)
+ if(odds(0.75))
+  if(startindex < numnotes)
+    if(odds (0.75))
+     sprout(list(play_line(thisscale, startindex, rate, pick(arp, (arp * -1))),
+                 play_chord(thisscale, startindex, orate, pick(1,3,5))))
+    else
+      sprout(list(play_line(thisscale, startindex, rate, pick(arp, (arp * -1))),
+                  play_line(thisscale, startindex + pick(-2, -1, 1, 2, 3, 4, 5), rate, pick(arp, (arp * -1)))))
+    end
+  end
+  else
+    sprout(list(play_chord(thisscale, startindex + 5, 1/2, 1),
+                play_chord(thisscale, startindex, 1/2, 1)))
+    wait 2
+  end
+ wait mrate
+end
+ 
+sprout(test_scales(49, 1/8), "test_scales-22.mid")
+
+; meta process
+
+process test(len)
+  with mrate = 1/4,
+       rate = 1/8,
+       arp = 1,
+       scale = {},
+       index = between(0, length(scale) - 1),
+       i = 0
+  until elapsed() >= len
+  set i += 1
+  set mrate = pick(1/4,1/2,1)
+  set rate = pick(1/2,1/4,1/8,1/16)
+  set scale = make_scale(nth(scales, i))
+  set index += odds(0.5, pick(1,1,1,2,2,3), pick(1,1,1,2,2,3) * -1)
+  set arp = odds(0.5, pick(1,1,1,2,2,3), pick(1,1,1,2,2,3) * -1)
+  if(i >= 48)
+    set i = 0
+  end
+  if(odds(0.75))
+    if(odds(0.5))
+      sprout(play_line(scale, index, rate, arp))
+      if(odds(0.5))
+        sprout(play_line(scale, index, rate, arp))
+      end
+    else
+      sprout(play_chord(scale, index, rate))
+    end
+  end
+  wait mrate
+end
+
+
+sprout(test(50))
